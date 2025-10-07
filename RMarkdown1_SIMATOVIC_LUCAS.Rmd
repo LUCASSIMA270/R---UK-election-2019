@@ -1,0 +1,473 @@
+---
+title: "Data Visualisation for Economics"
+subtitle: "Analysis of UK General Election 2019 Results"
+author: 
+  - "Lucas Simatovic"
+  - "Master 2 : Economie option DADEE"
+  - "Assigment 1"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+abstract: |
+  This report analyzes the 2019 UK General Election data to understand voting patterns, 
+  party performance across constituencies, and the relationship between major political 
+  parties. Key findings include a negative correlation between Labour and Conservative 
+  vote shares and regional variations in party support.
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 2
+    number_sections: true
+    fig_caption: true
+    latex_engine: xelatex
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+fontsize: 11pt
+geometry: "margin=2.5cm"
+lang: en-US
+---
+
+Installation of MikTex
+
+```{r echo=TRUE}
+options(tinytex.verbose = TRUE)
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Installation of libraries
+
+```{r libraries, echo=TRUE, message=FALSE, warning=FALSE}
+library(ukelection2019)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(here)
+```
+
+Question 1 :installation of ukelection2019 package
+
+```{r q1, warning=FALSE}
+remotes::install_github("kjhealy/ukelection2019")
+```
+
+Question 2 : brief look on the table
+
+```{r q2}
+ukvote2019
+```
+
+Question 3 : Dover constituency results
+
+> In the Dover constituency, Conservative Party won the election by 56.9% of the votes share follow by Labour party at 32.6% of the whole constiuency. 
+
+```{r q3}
+dover_results <- ukvote2019 %>%
+  filter(constituency == "Dover") %>%
+  print()
+```
+
+Question 4 : number of constituencies
+
+> There are 650 constituencies in UK.
+
+```{r q4, echo=TRUE, message=FALSE}
+number_of_constituencies_df <- ukvote2019 %>%
+  count(constituency)%>%
+  nrow()
+
+number_of_constituencies_df
+```
+
+Question 5 : candidates of partys run in the election 
+
+> All the results are not arrange. They are listed in the alphabetical order
+
+```{r q5}
+candidates_per_party_alphabetical_df <- ukvote2019%>%
+ group_by(party_name)%>%
+ summarise(n_candidates=n())%>%
+ print()
+```
+
+Question 6 : number of candidates for each party
+
+> The 3 main partys who run candidates are Consertive, Labour and Liberal Democrat who invest 636, 631 and 611 respectively. They are listed in descending order
+
+```{r q6}
+candidates_per_party_descending_df <- ukvote2019 %>%
+  group_by(party_name) %>%
+  summarise(number_of_candidates = n()) %>%
+  arrange(desc(number_of_candidates))
+
+candidates_per_party_descending_df
+```
+
+Question 7 : percentage by all candidates fielded in each party
+
+> The 3 main partys share 56.4% in the whole country. 
+
+```{r q7}
+candidates_percentage_df <- ukvote2019 %>%
+  group_by(party_name) %>%
+  summarise(
+    number_of_candidates = n(),
+    percentage_of_candidates = (n() / nrow(ukvote2019)) * 100
+  ) %>%
+  arrange(desc(percentage_of_candidates))
+
+candidates_percentage_df
+```
+
+Question 8 : top 5 worst candidates by votes share
+
+> The worst candidates by votes share in this election were : William Tobin (5), Bobby Elmo Smith (8), Norma Burke (22),Yace Yogeistein (23) and Scott Dore (28).
+
+```{r q8}
+worst_candidates_df <- ukvote2019 %>%
+  select(candidate, votes) %>% 
+  arrange(votes) %>%
+  head(5)
+
+worst_candidates_df
+```
+
+Question 9 : largest constituencies by number of votes share
+
+> We see : Bristol West (75528), Isle of Wight (74442), Wantage (67173), Cambrigeshire South (66929) and Northamptonshire South (66908). 
+
+```{r q9}
+best_constituencies_df <- ukvote2019 %>% 
+  group_by(constituency) %>%
+  summarise(total_votes = sum(votes)) %>% 
+  arrange(desc(total_votes)) %>% 
+  head(5)
+
+best_constituencies_df
+```
+
+Question 10 : votes cast of Conservative and Labour partys
+
+> Conservative and Labour share respectively 13993282	and 10269076 votes nationally.
+
+```{r q10}
+conservatives_and_labour_votes <- ukvote2019 %>%
+  filter(party_name %in% c("Labour", "Conservative")) %>%
+  group_by(party_name) %>%
+  summarise(total_votes = sum(votes))
+
+conservatives_and_labour_votes
+```
+
+Question 11 : top 10 largest vote-winning candidates measured by vote share in their constituency 
+
+> Dan Carden, in Liverpool Walton constituency is the highest vote share by percent in the country and won by 84.7% 
+
+```{r q11}
+top_candidates_df <- ukvote2019 %>%
+  select(constituency, candidate, vote_share_percent) %>% 
+  arrange(desc(vote_share_percent)) %>%
+  head(10)
+
+top_candidates_df
+```
+
+Question 12 : bar graph of Conservative and Labour party in terms of electors
+
+> Ok, Conservative party got more votes than Labour but in Bristol West and Northamptonshire South Labour won largely. Graph is save with ggsave
+
+```{r q12}
+largest_constituencies_by_electors <- ukvote2019 %>%
+  group_by(constituency) %>%
+  summarise(total_electors = first(electorate)) %>%  
+  arrange(desc(total_electors)) %>%
+  head(5)
+
+top_5_constituencies <- largest_constituencies_by_electors$constituency
+
+data_for_plot <- ukvote2019 %>%
+  filter(constituency %in% top_5_constituencies) %>%
+  filter(party_name %in% c("Labour", "Conservative")) %>%
+  select(constituency, party_name, vote_share_percent)
+
+q12_plot <- ggplot(data_for_plot, 
+                   aes(x = constituency, y = vote_share_percent, fill = party_name)) +
+  geom_col(position = "dodge") +  
+  labs(
+    title = "Labour vs Conservative vote share in the top 5 consituencies",
+    x = "Constituencies",
+    y = "Vote shares by percent",
+    fill = "Party"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +  
+  scale_fill_manual(values = c("Conservative" = "blue", "Labour" = "red"))  
+
+ggsave(here("graphs", "q12_labour_conservative_largest_constituencies.png"), 
+       plot = q12_plot, width = 10, height = 6, dpi = 300)
+
+print(q12_plot)
+```
+
+Question 13 : distribution of votes share (Conservative and Labour)
+
+> This graph suggest that Conservative has highest values in terms of votes share by percent so much so that Labour has lowest. Same as the precedent question to see the graph. 
+
+```{r q13}
+conservatives_and_labour_votes_2 <- ukvote2019 %>%
+  filter(party_name %in% c("Labour", "Conservative")) %>%
+  select(party_name, vote_share_percent)
+  
+q13_plot <- ggplot(conservatives_and_labour_votes_2, 
+                   aes(x = vote_share_percent, fill = party_name)) +
+  geom_density(alpha = 0.6) +
+  labs(
+    title = "Distribution of voting shares - Conservative and Labour partys",
+    x = "Vote shares (%)",
+    y = "Density",
+    fill = "Party"
+  ) +
+  theme_minimal() +
+  scale_fill_manual(values = c("Conservative" = "blue", "Labour" = "red"))
+
+ggsave(here("graphs", "q13_vote_share_distribution.png"), 
+       plot = q13_plot, width = 8, height = 6, dpi = 300)
+
+print(q13_plot)
+```
+
+Question 14 : differences in the turnout correlation
+
+> Convetive has a postive turnout correlation (0.2836349)	which means that as turnout increases, so does the party's share of the vote and the opposite way for Labour party (-0.4844304	). 	
+
+```{r q14, message=TRUE}
+turnout_data <- ukvote2019 %>%
+  filter(party_name %in% c("Labour", "Conservative")) %>%
+  select(constituency, party_name, vote_share_percent, turnout)
+
+q14_plot <- ggplot(turnout_data, aes(x = turnout, y = vote_share_percent)) +
+  geom_point(alpha = 0.6, size = 2, aes(color = party_name)) +
+  geom_smooth(method = "lm", se = TRUE, color = "black") +
+  facet_wrap(~party_name) +
+  labs(
+    title = "Correlation between participation rate and vote shares",
+    subtitle = "Separate analysis by party",
+    x = "Participation rate (%)",
+    y = "Vote shares (%)",
+    color = "Party"
+  ) +
+  theme_minimal() +
+  scale_color_manual(values = c("Conservative" = "blue", "Labour" = "red"))
+
+ggsave(here("graphs", "q14_turnout_correlation.png"), 
+       plot = q14_plot, width = 8, height = 6, dpi = 300) 
+
+print(q14_plot)
+
+# Turnout correlation
+
+correlation_stats <- turnout_data %>%
+  group_by(party_name) %>%
+  summarise(
+    correlation = cor(turnout, vote_share_percent, use = "complete.obs"),
+    .groups = "drop"
+  )
+
+correlation_stats
+```
+
+Question 15 : top 5 constituencies for the combinaison of Green and UKIP partys
+
+> In this top 5 we see that UKIP doesn't count anymore because it represents a very small part of the combinaison and absolutely not in 3 of them. 
+
+```{r q15}
+green_ukip_data <- ukvote2019 %>%
+  filter(party_name %in% c("Green", "UKIP")) %>%
+  select(constituency, party_name, vote_share_percent) %>%
+  pivot_wider(names_from = party_name, 
+              values_from = vote_share_percent, values_fill = 0) %>%
+  mutate(
+    Green = ifelse(is.na(Green), 0, Green),
+    UKIP = ifelse(is.na(UKIP), 0, UKIP),
+    combined_vote_share = Green + UKIP
+  ) %>%
+  arrange(desc(combined_vote_share)) %>%
+  head(5)
+
+green_ukip_data
+```
+
+Question 16 : 
+
+ i) the combined vote share of
+ the Green and Brexit Party, 
+ ii) the vote share of the Labour, 
+ iii) the vote share of the
+ Convervative. 
+ 
+> We see that in these constituencies, the combinaison of vote shares of UKIP and Green won elections in Brighton Pavillon and arrived second in Briston West. Same way like others for the graph. 
+
+```{r q16}
+top_5_constituencies <- green_ukip_data$constituency
+
+plot_data <- ukvote2019 %>%
+  filter(constituency %in% top_5_constituencies) %>%
+  filter(party_name %in% c("Green", "The Brexit Party", "Labour", "Conservative")) %>%
+  select(constituency, party_name, vote_share_percent)  
+
+combined_green_brexit <- plot_data %>%
+  filter(party_name %in% c("Green", "The Brexit Party")) %>%
+  group_by(constituency) %>%
+  summarise(vote_share_percent = sum(vote_share_percent), 
+            .groups = "drop") %>%  
+  mutate(party_name = "Green + The Brexit Party")
+
+labour_conservative <- plot_data %>%
+  filter(party_name %in% c("Labour", "Conservative"))
+
+final_plot_data <- bind_rows(combined_green_brexit, labour_conservative)
+
+q16_plot <- ggplot(final_plot_data, 
+                   aes(x = constituency, y = vote_share_percent, fill = party_name)) + 
+  geom_col(position = "dodge") +
+  labs(
+    title = "Vote shares in the 5 constituencies",
+    subtitle = "Green+Brexit Party vs Labour vs Conservative",
+    x = "Constituencies",
+    y = "Vote shares (%)",
+    fill = "Coalition and partys"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_manual(values = c(
+    "Green + The Brexit Party" = "darkgreen",
+    "Labour" = "red",
+    "Conservative" = "blue"
+  ))
+
+ggsave(here("graphs", "q16_green_brexit_constituencies.png"), 
+       plot = q16_plot, width = 10, height = 6, dpi = 300)
+
+print(q16_plot)
+```
+
+Question 17 : Green and Ukip less than 2%
+
+> They are 86 constituencies less than 2%.
+
+```{r q17, echo=TRUE}
+green_ukip_less_2 <- ukvote2019 %>% 
+  filter(party_name %in% c("Green", "UKIP"))%>%
+  group_by(constituency) %>% 
+  summarise(combined_votes_percent = sum(vote_share_percent), .groups = "drop") %>% 
+  filter(combined_votes_percent < 2) 
+
+nrow(green_ukip_less_2)
+```
+
+Question 18 : correlation between Labour and Conservative partys by vote share
+
+> The partys are negatively correlated (-0.5752), it means that if Conservative vote share increases, the Labour tends to decrease and vice versa. 
+
+```{r q18}
+labour_conservative_comparison <- ukvote2019 %>%
+  filter(party_name %in% c("Labour", "Conservative")) %>%
+  select(constituency, party_name, vote_share_percent) %>%
+  pivot_wider(names_from = party_name, 
+              values_from = vote_share_percent, values_fill = 0) %>%
+  mutate(
+    Labour = ifelse(is.na(Labour), 0, Labour),
+    Conservative = ifelse(is.na(Conservative), 0, Conservative)
+  )
+
+correlation_coefficient <- cor(labour_conservative_comparison$Conservative, 
+                               labour_conservative_comparison$Labour, 
+                               use = "complete.obs")
+
+cat("Correlation Coefficient Labour vs Conservative:",
+    round(correlation_coefficient, 4), "\n")
+
+summary_stats <- labour_conservative_comparison %>%
+  summarise(correlation = cor(Conservative, Labour)
+  )
+
+q18_plot <- ggplot(labour_conservative_comparison, 
+                   aes(x = Conservative, y = Labour)) +
+  geom_point(alpha = 0.6, size = 2, color = "purple") +
+  geom_smooth(method = "lm", se = TRUE, color = "black") +
+  labs(
+    title = "Vote share Labour vs Conservative par circonscription",
+    subtitle = paste("Correlation coefficient:", round(correlation_coefficient, 3)),
+    x = "Vote share Conservative (%)",
+    y = "Vote share Labour (%)"
+  ) +
+  theme_minimal() +
+  annotate("text", x = max(labour_conservative_comparison$Conservative) * 0.7, 
+           y = max(labour_conservative_comparison$Labour) * 0.9,
+           label = paste("r =", round(correlation_coefficient, 3)), 
+           size = 5, fontface = "bold")
+
+ggsave(here("graphs", "q18_labour_conservative_correlation.png"), 
+       plot = q18_plot, width = 8, height = 6, dpi = 300)
+
+print(q18_plot)
+```
+
+Question 19 : create new dataframe
+
+> Liberal Democrats compete directly with Labour for center-left voters with a negative correlation while showing weak alignment with Conservatives (positive correlation). This suggests they primarily split the progressive vote rather than attracting right-leaning voters.
+
+```{r q19}
+vote_data_wide <- ukvote2019 %>%
+  filter(party_name %in% c("Liberal Democrat", "Labour", "Conservative")) %>%
+  select(constituency, party_name, vote_share_percent) %>%
+  pivot_wider(names_from = party_name, 
+              values_from = vote_share_percent, values_fill = 0) %>%
+  rename_with(~gsub(" ", "_", .x))
+
+filtered_data <- vote_data_wide %>%
+  filter(Liberal_Democrat > 0)
+
+lib_dem_conservative <- filtered_data %>%
+  select(Liberal_Democrat, Conservative) %>%
+  mutate(comparison = "Liberal Democrat vs Conservative")
+
+lib_dem_labour <- filtered_data %>%
+  select(Liberal_Democrat, Labour) %>%
+  rename(Conservative = Labour) %>%  
+  mutate(comparison = "Liberal Democrat vs Labour")
+
+combined_data <- bind_rows(lib_dem_conservative, lib_dem_labour)
+
+plot_q19 <- ggplot(filtered_data) +
+  geom_point(aes(x = Liberal_Democrat, y = Conservative), 
+             color = "blue", alpha = 0.6, size = 2) +
+  geom_smooth(aes(x = Liberal_Democrat, y = Conservative), 
+              method = "lm", se = TRUE, color = "blue") +
+  geom_point(aes(x = Liberal_Democrat, y = Labour), 
+             color = "red", alpha = 0.6, size = 2) +
+  geom_smooth(aes(x = Liberal_Democrat, y = Labour), 
+              method = "lm", se = TRUE, color = "red") +
+  labs(
+    title = "Liberal Democrat vote share correlations",
+    subtitle = "Blue: vs Conservative | Red: vs Labour",
+    x = "Liberal Democrat vote share (%)",
+    y = "Vote share (%)"
+  ) +
+  theme_minimal() +
+  annotate("text", x = max(filtered_data$Liberal_Democrat) * 0.7, 
+           y = max(c(filtered_data$Conservative, filtered_data$Labour)) * 0.9,
+           label = "Blue: vs Conservative\nRed: vs Labour", 
+           color = "black", size = 4, hjust = 0)
+
+ggsave(here("graphs", "q19_libdem_correlations.png"), 
+       plot = plot_q19, width = 8, height = 6, dpi = 300)
+
+print(plot_q19)
+```
+
+Question 20 : use ggsave for questions 12, 13, 14, 16, 18 et 19
+
+### Fin du devoir. Merci 
